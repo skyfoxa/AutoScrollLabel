@@ -52,7 +52,7 @@ typedef NS_ENUM(NSInteger, CBAutoScrollDirection) {
 @property (nonatomic) NSTextAlignment textAlignment; // only applies when not auto-scrolling
 
 
-- (BOOL)isScrollNeededForNumberOfLines:(int)nLines;
+- (BOOL)isScrollNeededForNumberOfLines:(float)nLines;
 
 /**
  * Lays out the scrollview contents, enabling text scrolling if the text will be clipped.

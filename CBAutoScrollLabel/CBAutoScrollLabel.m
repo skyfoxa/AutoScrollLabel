@@ -218,7 +218,7 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
     return self.mainLabel.shadowOffset;
 }
 
-- (BOOL)isScrollNeededForNumberOfLines:(int)nLines {
+- (BOOL)isScrollNeededForNumberOfLines:(float)nLines {
     [self.mainLabel sizeToFit];
     return (CGRectGetWidth(self.mainLabel.bounds) > (CGRectGetWidth(self.bounds))*nLines);
 }
