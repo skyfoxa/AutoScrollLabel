@@ -218,6 +218,11 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
     return self.mainLabel.shadowOffset;
 }
 
+- (BOOL)isScrollNeeded {
+    [mainLabel sizeToFit];
+    return (CGRectGetWidth(self.mainLabel.bounds) > CGRectGetWidth(self.bounds));
+}
+
 #pragma mark - Autolayout
 
 - (CGSize)intrinsicContentSize {
@@ -361,7 +366,7 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
     [self.scrollView.layer removeAllAnimations];
 
     // if the label is bigger than the space allocated, then it should scroll
-    if (CGRectGetWidth(self.mainLabel.bounds) > CGRectGetWidth(self.bounds)) {
+    if (self.isScrollNeeded) {
         CGSize size;
         size.width = CGRectGetWidth(self.mainLabel.bounds) + self.labelSpacing; //+ CGRectGetWidth(self.bounds) ;
         size.height = CGRectGetHeight(self.bounds);
