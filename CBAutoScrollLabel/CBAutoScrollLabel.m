@@ -218,9 +218,13 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
     return self.mainLabel.shadowOffset;
 }
 
+- (BOOL)isScrollNeededForNumberOfLines:(int)nLines {
+    [self.mainLabel sizeToFit];
+    return (CGRectGetWidth(self.mainLabel.bounds) > (CGRectGetWidth(self.bounds))*nLines);
+}
+
 - (BOOL)isScrollNeeded {
-    [mainLabel sizeToFit];
-    return (CGRectGetWidth(self.mainLabel.bounds) > CGRectGetWidth(self.bounds));
+    return [self isScrollNeededForNumberOfLines:1];
 }
 
 #pragma mark - Autolayout
