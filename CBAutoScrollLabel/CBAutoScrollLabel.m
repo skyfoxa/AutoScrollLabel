@@ -13,7 +13,7 @@
 #import "CBAutoScrollLabel.h"
 #import <QuartzCore/QuartzCore.h>
 
-#define kLabelCount 2
+#define kLabelCount 1
 #define kDefaultFadeLength 7.f
 // pixel buffer space between scrolling label
 #define kDefaultLabelBufferSpace 20
@@ -32,7 +32,7 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
 
 @interface CBAutoScrollLabel ()
 
-@property (nonatomic, strong) NSArray<UILabel *> *labels;
+@property (nonatomic, strong) NSArray *labels;
 @property (nonatomic, strong, readonly) UILabel *mainLabel;
 @property (nonatomic, strong) UIScrollView *scrollView;
 
@@ -56,7 +56,7 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
 
 - (void)commonInit {
     // create the labels
-    NSMutableSet<UILabel *> *labelSet = [[NSMutableSet alloc] initWithCapacity:kLabelCount];
+    NSMutableSet *labelSet = [[NSMutableSet alloc] initWithCapacity:kLabelCount];
 
     for (int index = 0; index < kLabelCount; ++index) {
         UILabel *label = [[UILabel alloc] init];
@@ -104,14 +104,6 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
     [self didChangeFrame];
 }
 
-- (void)didMoveToWindow {
-    [super didMoveToWindow];
-    
-    if (self.window) {
-        [self scrollLabelIfNeeded];
-    }
-}
-
 #pragma mark - Properties
 
 - (UIScrollView *)scrollView {
@@ -135,7 +127,7 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
 }
 
 - (UILabel *)mainLabel {
-    return [self.labels firstObject];
+    return self.labels[0];
 }
 
 - (void)setText:(NSString *)theText {
@@ -229,7 +221,7 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
 #pragma mark - Autolayout
 
 - (CGSize)intrinsicContentSize {
-    return CGSizeMake(0, [self.mainLabel intrinsicContentSize].height);
+    return CGSizeMake(0.0f, [self.mainLabel intrinsicContentSize].height);
 }
 
 #pragma mark - Misc
@@ -277,6 +269,19 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
     [self.scrollView.layer removeAllAnimations];
 
     BOOL doScrollLeft = (self.scrollDirection == CBAutoScrollDirectionLeft);
+
+    switch (self.scrollDirection) {
+        case CBAutoScrollDirectionRight:
+        case CBAutoScrollDirectionLeft:
+            [self animateOneWay:doScrollLeft labelWidth:labelWidth];
+            break;
+        case CBAutoScrollDirectionLeftRight:
+            [self animateLeftRight:labelWidth];
+            break;
+    }
+}
+
+- (void)animateOneWay:(BOOL)doScrollLeft labelWidth: (CGFloat)labelWidth {
     self.scrollView.contentOffset = (doScrollLeft ? CGPointZero : CGPointMake(labelWidth + self.labelSpacing, 0));
 
     // Add the left shadow after delay
@@ -287,8 +292,8 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
     [UIView animateWithDuration:duration delay:self.pauseInterval options:self.animationOptions | UIViewAnimationOptionAllowUserInteraction animations:^{
          // adjust offset
          self.scrollView.contentOffset = (doScrollLeft ? CGPointMake(labelWidth + self.labelSpacing, 0) : CGPointZero);
-     } completion:^(BOOL finished) {
-         self->_scrolling = NO;
+     } completion: ^(BOOL finished) {
+         _scrolling = NO;
 
          // remove the left shadow
          [self applyGradientMaskForFadeLength:self.fadeLength enableFade:NO];
@@ -300,12 +305,47 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
      }];
 }
 
+- (void)animateLeftRight:(CGFloat)labelWidth {
+    self.scrollView.contentOffset = CGPointZero;
+
+    // Add the left shadow after delay
+    [self applyGradientMaskForFadeLength:self.fadeLength enableFade:NO];
+    [self performSelector:@selector(enableShadow) withObject:nil afterDelay:self.pauseInterval];
+
+    // animate the scrolling
+    NSTimeInterval duration = labelWidth / self.scrollSpeed;
+    [UIView animateWithDuration:duration delay:self.pauseInterval options:self.animationOptions | UIViewAnimationOptionAllowUserInteraction animations:^{
+         // adjust offset
+         self.scrollView.contentOffset = CGPointMake(labelWidth - self.bounds.size.width, 0);
+     } completion: ^(BOOL finished) {
+         if (finished) {
+             [self applyGradientMaskForFadeLength:self.fadeLength enableFade:NO];
+             [self performSelector:@selector(enableShadow) withObject:nil afterDelay:self.pauseInterval];
+
+             [UIView animateWithDuration:duration delay:self.pauseInterval options:self.animationOptions | UIViewAnimationOptionAllowUserInteraction animations:^{
+                  // adjust offset
+                  self.scrollView.contentOffset = CGPointZero;
+              } completion: ^(BOOL finished) {
+                  _scrolling = NO;
+
+                  // remove the left shadow
+                  [self applyGradientMaskForFadeLength:self.fadeLength enableFade:NO];
+
+                  // setup pause delay/loop
+                  if (finished) {
+                      [self performSelector:@selector(scrollLabelIfNeeded) withObject:nil];
+                  }
+              }];
+         }
+     }];
+}
+
 - (void)refreshLabels {
     __block float offset = 0;
 
     each_object(self.labels, ^(UILabel *label) {
         [label sizeToFit];
-
+        
         CGRect frame = label.frame;
         frame.origin = CGPointMake(offset, 0);
         frame.size.height = CGRectGetHeight(self.bounds);
@@ -323,7 +363,7 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
     // if the label is bigger than the space allocated, then it should scroll
     if (CGRectGetWidth(self.mainLabel.bounds) > CGRectGetWidth(self.bounds)) {
         CGSize size;
-        size.width = CGRectGetWidth(self.mainLabel.bounds) + CGRectGetWidth(self.bounds) + self.labelSpacing;
+        size.width = CGRectGetWidth(self.mainLabel.bounds) + self.labelSpacing; //+ CGRectGetWidth(self.bounds) ;
         size.height = CGRectGetHeight(self.bounds);
         self.scrollView.contentSize = size;
 
@@ -349,7 +389,7 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
     }
 }
 
-// bounds or frame has been changed
+// bounds or frame has been changeds
 - (void)didChangeFrame {
     [self refreshLabels];
     [self applyGradientMaskForFadeLength:self.fadeLength enableFade:self.scrolling];
@@ -387,6 +427,10 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
         NSNumber *leftFadePoint = @(fadePoint);
         NSNumber *rightFadePoint = @(1 - fadePoint);
         if (!fade) switch (self.scrollDirection) {
+                case CBAutoScrollDirectionLeftRight:
+                    leftFadePoint = @0;
+                    rightFadePoint = @1;
+                    break;
                 case CBAutoScrollDirectionLeft:
                     leftFadePoint = @0;
                     break;
@@ -420,3 +464,4 @@ static void each_object(NSArray *objects, void (^block)(id object)) {
 }
 
 @end
+
